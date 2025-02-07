@@ -15,18 +15,20 @@ SOFTWARE.
 import time
 import json
 import tiktoken
-import openai
+import os
+from openai import OpenAI
+
 import pickle
 import numpy as np
 from tqdm import tqdm
 import dotenv
-import os
+
 
 BLOCK_SIZE = 500
 EMBED_MAX_SIZE = 8150
 
 dotenv.load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 enc = tiktoken.get_encoding("cl100k_base")
 
 
@@ -44,9 +46,7 @@ def embed_text(text, sleep_after_success=1):
 
     while True:
         try:
-            res = openai.Embedding.create(
-                input=[text],
-                model="text-embedding-ada-002")
+            res = client.embeddings.create(input=[text], model="text-embedding-3-small")
             time.sleep(sleep_after_success)
         except Exception as e:
             print(e)
@@ -54,7 +54,7 @@ def embed_text(text, sleep_after_success=1):
             continue
         break
 
-    return res["data"][0]["embedding"]
+    return res.data[0].embedding
 
 
 def update_from_scrapbox(json_file, out_index, in_index=None):
@@ -92,7 +92,7 @@ def update_from_scrapbox(json_file, out_index, in_index=None):
             body = " ".join(buf)
             if get_size(body) > BLOCK_SIZE:
                 vs.add_record(body, title, cache)
-                buf = buf[len(buf) // 2:]
+                buf = buf[len(buf) // 2 :]
         body = " ".join(buf).strip()
         if body:
             vs.add_record(body, title, cache)
