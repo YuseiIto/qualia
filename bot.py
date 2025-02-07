@@ -20,6 +20,7 @@ import dotenv
 import boto3  # AWS SDK for interacting with S3
 import pickle
 import logging
+from make_index import VectorStore, get_size
 
 # Load environment variables (for local testing, not needed in Lambda)
 dotenv.load_dotenv()
@@ -61,26 +62,6 @@ def load_index_from_s3(bucket_name, key):
 
 def get_size(text):
     return len(text.encode("utf-8"))
-
-
-class VectorStore:  # Simplified VectorStore. Replace with your actual implementation if needed.
-    def __init__(self, index_data):
-        self.index_data = index_data
-
-    def get_sorted(self, input_str):
-        # Replace with actual similarity search based on your index structure
-        # This example just returns some data from the loaded index
-
-        # Simulate sorted results based on a simple string match
-        results = []
-        for title, body in self.index_data.items():
-            if input_str.lower() in title.lower() or input_str.lower() in body.lower():
-                results.append((1.0, body, title))  # Simulated similarity score of 1.0
-            else:
-                results.append((0.5, body, title))  # Simulated lower similarity score
-
-        return results
-
 
 def ask(input_str, index, openai_client):
     """Asks the OpenAI model a question, using the index for context."""
@@ -192,6 +173,7 @@ if not MINIO_SECRET_KEY:
 
 if not OPENAI_API_KEY:
     logger.error("`OPENAI_API_KEY` not set.")
+
 
 if DISCORD_BOT_TOKEN:
     bot.run(DISCORD_BOT_TOKEN)
