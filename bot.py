@@ -19,7 +19,7 @@ import openai
 import dotenv
 import boto3  # AWS SDK for interacting with S3
 import pickle
-
+import logging
 
 # Load environment variables (for local testing, not needed in Lambda)
 dotenv.load_dotenv()
@@ -37,6 +37,8 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 
 
+logger = logging.getLogger(__name__)
+
 # --- Helper Functions ---
 
 def load_index_from_s3(bucket_name, key):
@@ -53,7 +55,7 @@ def load_index_from_s3(bucket_name, key):
         index = pickle.loads(index_data)
         return index
     except Exception as e:
-        print(f"Error loading index from S3: {e}")
+        logger.error(f"Error loading index from S3: {e}")
         return None
 
 
@@ -120,7 +122,7 @@ def ask(input_str, index, openai_client):
     text = "\n\n".join(to_use)
     prompt = PROMPT.format(input=input_str, text=text)
 
-    print("\nTHINKING...")
+    logger.debug("\nTHINKING...")
     try:
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -130,13 +132,13 @@ def ask(input_str, index, openai_client):
         )
 
         content = response.choices[0].message.content
-        print("\nANSWER:")
-        print(f">>>> {input_str}")
-        print(">", content)
+        logger.debug("\nANSWER:")
+        logger.debug(f">>>> {input_str}")
+        logger.debug(">", content)
         return content
 
     except Exception as e:
-        print(f"Error during OpenAI API call: {e}")
+        logger.error(f"Error during OpenAI API call: {e}")
         return "An error occurred with the AI assistant."
 
 
@@ -150,7 +152,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user.name} ({bot.user.id})")
+    logger.info(f"Logged in as {bot.user.name} ({bot.user.id})")
 
 
 @bot.command(name="ask")
@@ -173,25 +175,25 @@ async def ask_command(
         answer = ask(question, index_data, client)
         await ctx.send(answer)
     except Exception as e:
-        print(f"Error processing question: {e}")
+        logger.error(f"Error processing question: {e}")
         await ctx.send("An error occurred while processing the question.")
 
 if not MINIO_ENDPOINT_URL:
-    print("`MINIO_ENDPOINT_URL` not set.")
+    logger.error("`MINIO_ENDPOINT_URL` not set.")
 
 if not MINIO_BUCKET_NAME:
-    print("`MINIO_BUCKET_NAME` not set.")
+    logger.error("`MINIO_BUCKET_NAME` not set.")
 
 if  not MINIO_ACCESS_KEY:
-    print("`MINIO_ACCESS_KEY` not set.")
+    logger.error("`MINIO_ACCESS_KEY` not set.")
 
 if not MINIO_SECRET_KEY:
-    print("`MINIO_SECRET_KEY` not set.")
+    logger.error("`MINIO_SECRET_KEY` not set.")
 
 if not OPENAI_API_KEY:
-    print("`OPENAI_API_KEY` not set.")
+    logger.error("`OPENAI_API_KEY` not set.")
 
 if DISCORD_BOT_TOKEN:
     bot.run(DISCORD_BOT_TOKEN)
 else:
-    print("Discord bot token not found in environment variables.")
+    logger.error("Discord bot token not found in environment variables.")
