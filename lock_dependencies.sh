@@ -1,0 +1,2 @@
+rye sync
+rye lock
