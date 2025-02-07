@@ -20,6 +20,7 @@ import dotenv
 import boto3  # AWS SDK for interacting with S3
 import logging
 from make_index import VectorStore, get_size
+from time import sleep
 
 # Load environment variables (for local testing, not needed in Lambda)
 dotenv.load_dotenv()
@@ -140,13 +141,14 @@ async def ask_command(
     ctx, *, question
 ):  # The * makes the bot take the rest of the message as the 'question' arg
     """Asks the AI assistant a question."""
-    await ctx.send("Thinking...")  # Send an initial response
 
-    client = openai.OpenAI()  # Create an OpenAI Client to use for this command
+    await ctx.defer()
 
     try:
-        answer = ask(question, client)
-        await ctx.send(answer)
+        async with ctx.typing():
+            client = openai.OpenAI()  # Create an OpenAI Client to use for this command
+            answer = ask(question, client)
+            await ctx.reply(answer)
     except Exception as e:
         logger.error(f"Error processing question: {e}")
         await ctx.send("An error occurred while processing the question.")
