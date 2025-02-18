@@ -22,6 +22,8 @@ import logging
 from make_index import VectorStore, get_size
 from time import sleep
 
+from pprint import pprint
+
 # Load environment variables (for local testing, not needed in Lambda)
 dotenv.load_dotenv()
 
@@ -63,22 +65,20 @@ def acquire_index_from_s3(bucket_name, key):
         return None
 
 
-def ask(input_str, openai_client):
+def ask(input_str,history, openai_client):
     """Asks the OpenAI model a question, using the index for context."""
 
     # TODO: Prompt engineering for better results
-    PROMPT = """
+    SYSTEM_PROMPT = """
     あなたは、yuseiitoのAIアシスタントで、クオリアといいます。
-    あなたは、以下にyuseiitoのWikiに書かれた内容の例示と入力を受け取ります。
+    あなたは、以下にyuseiitoのWikiに書かれた内容を受け取ります。
     入力に対して、Wikiの中から関連する情報を取得したり、それらと矛盾しないように回答を生成してください。
 
     ## Wiki
     {text}
-    ## Input
-    {input}
     """.strip()
 
-    PROMPT_SIZE = get_size(PROMPT)
+    PROMPT_SIZE = get_size(SYSTEM_PROMPT)
     rest = MAX_PROMPT_SIZE - RETURN_SIZE - PROMPT_SIZE
     input_size = get_size(input_str)
     if rest < input_size:
@@ -101,13 +101,13 @@ def ask(input_str, openai_client):
         rest -= size
 
     text = "\n\n".join(to_use)
-    prompt = PROMPT.format(input=input_str, text=text)
+    prompt = SYSTEM_PROMPT.format(text=text)
 
     logger.debug("\nTHINKING...")
     try:
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "system","content": prompt},*history,{"role": "user", "content": input_str}],
             max_tokens=RETURN_SIZE,
             temperature=0.0,
         )
@@ -131,6 +131,16 @@ intents.message_content = True  # Enable reading message content
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+async def fetch_reply_history(ctx,message):
+    ref = message.reference
+    history = []
+    while ref is not None:
+        parent = await ctx.fetch_message(ref.message_id)
+        history.append(parent)
+        ref = parent.reference
+    history.reverse()
+    return history
+
 @bot.event
 async def on_ready():
     logger.info(f"Logged in as {bot.user.name} ({bot.user.id})")
@@ -144,10 +154,13 @@ async def ask_command(
 
     await ctx.defer()
 
+    discord_history = await fetch_reply_history(ctx,ctx.message)
+    history = [{"role": "assistant" if m.author.id==ctx.me.id else "user", "content": m.content} for m in discord_history]
+
     try:
         async with ctx.typing():
             client = openai.OpenAI()  # Create an OpenAI Client to use for this command
-            answer = ask(question, client)
+            answer = ask(question,history,client)
             await ctx.reply(answer)
     except Exception as e:
         logger.error(f"Error processing question: {e}")
