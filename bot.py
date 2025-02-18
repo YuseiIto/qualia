@@ -22,8 +22,6 @@ import logging
 from make_index import VectorStore, get_size
 from time import sleep
 
-from pprint import pprint
-
 # Load environment variables (for local testing, not needed in Lambda)
 dotenv.load_dotenv()
 
@@ -139,32 +137,26 @@ async def fetch_reply_history(ctx,message):
         history.append(parent)
         ref = parent.reference
     history.reverse()
-    return history
+    return [{"role": "assistant" if m.author.id==bot.user.id else "user", "content": m.content} for m in history]
 
 @bot.event
 async def on_ready():
     logger.info(f"Logged in as {bot.user.name} ({bot.user.id})")
 
-
-@bot.command(name="ask")
-async def ask_command(
-    ctx, *, question
-):  # The * makes the bot take the rest of the message as the 'question' arg
-    """Asks the AI assistant a question."""
-
-    await ctx.defer()
-
-    discord_history = await fetch_reply_history(ctx,ctx.message)
-    history = [{"role": "assistant" if m.author.id==ctx.me.id else "user", "content": m.content} for m in discord_history]
-
-    try:
-        async with ctx.typing():
-            client = openai.OpenAI()  # Create an OpenAI Client to use for this command
-            answer = ask(question,history,client)
-            await ctx.reply(answer)
-    except Exception as e:
-        logger.error(f"Error processing question: {e}")
-        await ctx.send("An error occurred while processing the question.")
+@bot.event
+async def on_message(message):
+    # Check if I'm mentioned in the message
+    if bot.user.mentioned_in(message):
+        content = message.content
+        history = await fetch_reply_history(message.channel,message)
+        try:
+            async with message.channel.typing():
+                client = openai.OpenAI()  # Create an OpenAI Client to use for this command
+                answer = ask(content,history,client)
+                await message.reply(answer)
+        except Exception as e:
+            logger.error(f"Error processing question: {e}")
+            await message.channel.send("An error occurred while processing the question.")
 
 
 if not MINIO_ENDPOINT_URL:
