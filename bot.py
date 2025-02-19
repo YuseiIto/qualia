@@ -26,8 +26,8 @@ from time import sleep
 dotenv.load_dotenv()
 
 # --- Constants and Configurations ---
-MAX_PROMPT_SIZE = 4096
-RETURN_SIZE = 500
+MAX_PROMPT_SIZE = 50000 # Must be less than GPT-4o-mini context window size (128K)
+RETURN_SIZE = 1000 # The larger the longer the answer, but the fewer the input
 INDEX_FILE_S3_KEY = "yuseiito-private.pickle"  # Key in your S3 bucket
 
 MINIO_ENDPOINT_URL = os.environ.get("MINIO_ENDPOINT_URL")
